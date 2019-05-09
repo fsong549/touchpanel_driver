@@ -1,0 +1,11 @@
+#
+# Touchscreen driver configuration
+#
+if TOUCHSCREEN_MTK_MSGDRV_V7_BIRD
+
+config  BIRD_MSGDRV_V7_CTP_TSFW
+	string "BIRD_MSGDRV_V7_CTP_TSFW Config"
+	---help---
+	  This selects the MSGDRV_V7_BIRD driver.
+
+endif

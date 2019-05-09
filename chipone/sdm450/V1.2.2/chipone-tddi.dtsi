@@ -1,0 +1,16 @@
+/* 
+ * Chipone TDDI touchscreen driver device tree source include file
+ */
+&i2c_1 {
+	status = "ok";
+	chipone_tddi@48 {
+		compatible = "chipone-tddi";
+		reg = <0x48>;
+		interrupt-parent = <&msm_gpio>;
+		interrupts = <65 0x2008>;
+		chipone,rst-gpio = <&msm_gpio 102 0x00>;
+		chipone,irq-gpio = <&msm_gpio 65 0x00>;
+		chipone,x-res = <720>;
+		chipone,y-res = <1440>;
+	};
+};

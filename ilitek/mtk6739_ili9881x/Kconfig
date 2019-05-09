@@ -1,0 +1,7 @@
+#
+# Touchscreen driver configuration
+#
+
+
+config ILI9881X_CONFIG_NEW
+	string "ili9881x for Mediatek config"

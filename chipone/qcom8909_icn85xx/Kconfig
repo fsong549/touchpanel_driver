@@ -1,0 +1,21 @@
+#
+# Chipone ICN85XX Touchscreen driver
+#
+config TOUCHSCREEN_ICN85XX_GESTURE
+	tristate "icn85xx touchpanel for gesture"
+	depends on TOUCHSCREEN_ICN85XX_TS
+	default n
+	help
+	  This is an interface support for Icn85xx touchscreens gesture.
+
+	  Say Y here if you want to have an interface for Icn85xx touchscreen gesture
+	  to your system.
+
+	  If unsure, say N.
+
+config TOUCHSCREEN_ICN85XX_FH
+       bool "ICN85XX Touchscreens FH support."
+       depends on TOUCHSCREEN_USB_CHECK
+       help
+         Say Y here if you need a icn85xx touchscreen FH function.
+	 else say N

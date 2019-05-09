@@ -1,0 +1,98 @@
+#**********uniscope-driver-modify-file-on-qualcomm-platform*****************#
+#
+# TOUCHSCREEN_FTS
+#
+
+config TOUCHSCREEN_FTS
+	tristate "Focaltech Fts touchpanel driver"
+	depends on TOUCHSCREEN_FOCALTECH
+	default n
+	help
+	  This is the main file for touchpanel driver for TOUCHSCREEN_FTS
+
+	  Say Y here if you have a TOUCHSCREEN_FTS touchscreen connected
+	  to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called.
+
+
+config TOUCHSCREEN_FOCALTECH_CORE
+	tristate "Focaltech Fts touchpanel driver"
+	depends on TOUCHSCREEN_FOCALTECH
+	default n
+	help
+	  This is the main file for touchpanel driver for TOUCHSCREEN_FTS
+
+	  Say Y here if you have a TOUCHSCREEN_FTS touchscreen connected
+	  to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called.
+
+config TOUCHSCREEN_CTL
+	tristate "Focaltech Fts touchpanel driver"
+	depends on TOUCHSCREEN_FOCALTECH
+	default n
+	help
+	  This is the main file for touchpanel driver for TOUCHSCREEN_FTS
+
+	  Say Y here if you have a TOUCHSCREEN_FTS touchscreen connected
+	  to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called.
+
+config TOUCHSCREEN_EX_FUN
+	tristate "Focaltech Fts touchpanel driver"
+	depends on TOUCHSCREEN_FOCALTECH
+	default n
+	help
+	  This is the main file for touchpanel driver for TOUCHSCREEN_FTS
+
+	  Say Y here if you have a TOUCHSCREEN_FTS touchscreen connected
+	  to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called.
+
+config TOUCHSCREEN_FLASH
+	tristate "Focaltech Fts touchpanel driver"
+	depends on TOUCHSCREEN_FOCALTECH
+	default n
+	help
+	  This is the main file for touchpanel driver for TOUCHSCREEN_FTS
+
+	  Say Y here if you have a TOUCHSCREEN_FTS touchscreen connected
+	  to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called.
+
+config TOUCHSCREEN_GESTURE
+	tristate "Focaltech Fts touchpanel driver"
+	depends on TOUCHSCREEN_FOCALTECH
+	default n
+	help
+	  This is the main file for touchpanel driver for TOUCHSCREEN_FTS
+
+	  Say Y here if you have a TOUCHSCREEN_FTS touchscreen connected
+	  to your system.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called.
+
+
+

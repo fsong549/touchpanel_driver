@@ -1,0 +1,16 @@
+#
+# Touchscreen driver configuration
+#
+if TOUCHSCREEN_MTK_NT36525
+
+config TOUCHSCREEN_NT36525_1080_1920
+		bool "NT36xxx_1080_1920"
+		depends on I2C
+		default n
+		help
+			Say Y here if you have a Novatek NT36xxx Panel
+			to the host processor over I2C
+
+			If unsure, say N.
+
+endif
