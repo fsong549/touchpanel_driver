@@ -1357,7 +1357,7 @@ static ssize_t manualdiffdata_show(struct device *dev,
     int max_r, max_c, min_r, min_c;
     bool data_valid = true;
     int frame;
-    struct file *file;
+    struct file *file=NULL;
     int i;
     loff_t pos = 0;
     
@@ -1816,7 +1816,7 @@ int cts_sysfs_add_device(struct device *dev)
 {
     struct chipone_ts_data *cts_data = dev_get_drvdata(dev);
     struct cts_device *cts_dev = &cts_data->cts_dev;
-    int ret, i;
+    int ret=0, i;
 
     cts_info("Add device attr groups");
 

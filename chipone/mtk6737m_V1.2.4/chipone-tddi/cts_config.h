@@ -18,6 +18,7 @@
 #endif
 #endif
 
+#define CFG_CTS_MANUAL_CS 
 
 #define CFG_CTS_FORCE_UP
 

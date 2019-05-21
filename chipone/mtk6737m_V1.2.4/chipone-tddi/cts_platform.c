@@ -3,6 +3,7 @@
 #include "cts_config.h"
 #include "cts_platform.h"
 #include "cts_core.h"
+#include "../../../../spi/mediatek/mt6757/mtk_spi.h"
 
 int tpd_rst_gpio_index = 0;
 int tpd_int_gpio_index = 1;
@@ -188,6 +189,17 @@ int cts_plat_is_i2c_online(struct cts_platform_data *pdata, u8 i2c_addr)
     }
 }
 #else
+int cts_plat_set_cs(struct cts_platform_data *pdata, u8 val)
+{
+    if (val) {      
+        pinctrl_select_state(pdata->pinctrl1, pdata->spi_cs_low);
+    } 
+    else {
+        pinctrl_select_state(pdata->pinctrl1, pdata->spi_cs_high);
+    }    
+    return 0;
+}    
+
 int cts_spi_send_recv(struct cts_platform_data *pdata, size_t len , u8 *tx_buffer, u8 *rx_buffer)
 {
 	struct chipone_ts_data *cts_data;
@@ -203,22 +215,21 @@ int cts_spi_send_recv(struct cts_platform_data *pdata, size_t len , u8 *tx_buffe
         .rx_dma = 0,
         .bits_per_word = 0,
     };
-    int error = 0 ;
+    int ret = 0 ;
 	cts_data = container_of(pdata->cts_dev, struct chipone_ts_data, cts_dev);
-#if 0 // FPSENSOR_MANUAL_CS
-    fpsensor_gpio_wirte(FPSENSOR_SPI_CS_PIN, 0);
+#ifdef CFG_CTS_MANUAL_CS
+    cts_plat_set_cs(pdata, 0);
 #endif
-    //fpsensor_spi_set_mode(fpsensor->spi, (u32)fpsensor->spi_freq_khz, 0);
     spi_message_init(&msg);
     spi_message_add_tail(&cmd,  &msg);
-    error = spi_sync(cts_data->spi_client, &msg);
+    ret = spi_sync(cts_data->spi_client, &msg);
     if (error) {
         cts_err("spi_sync failed.\n");
     }
-#if 0 // FPSENSOR_MANUAL_CS
-    fpsensor_gpio_wirte(FPSENSOR_SPI_CS_PIN, 1);
+#ifdef CFG_CTS_MANUAL_CS
+    cts_plat_set_cs(pdata, 1);
 #endif
-    return error;
+    return ret;
 }
 
 size_t cts_plat_get_max_spi_xfer_size(struct cts_platform_data *pdata)
@@ -283,18 +294,6 @@ int cts_plat_spi_read(struct cts_platform_data *pdata, u8 i2c_addr,
 				continue;
 			}
 			memcpy(rbuf, pdata->spi_rx_buf+5, rlen);
-/*			
-			{
-				int i;
-				cts_info("rlen=%d", rlen);
-				for (i = 0; i < rlen + 5; i++) {
-					cts_info("rx[%d]=0x%02x, ", i, pdata->spi_rx_buf[i]);
-				}	
-				for (i = 0; i < rlen + 5; i++) {
-					cts_info("tx[%d]=0x%02x, ", i, pdata->spi_tx_buf[i]);
-				}	
-			}	
-*/			
 			return 0;
 		} while(++retries < retry);
 	}
@@ -421,6 +420,31 @@ static void cts_plat_touch_event_timeout(unsigned long arg)
 #endif
 
 #ifdef CONFIG_CTS_I2C_HOST
+static int cts_plat_init_dts(struct cts_platform_data *pdata,
+                                    struct spi_device *spi)
+{
+    struct device_node *node;
+
+    spi->dev.of_node = of_find_compatible_node(NULL, NULL, "chipone-tddi");
+    pdata->pinctrl1 = devm_pinctrl_get(&spi->dev);
+    node = of_find_compatible_node(NULL, NULL, "chipone-tddi");
+    if (node) {
+        pdata->spi_cs_low = pinctrl_lookup_state(pdata->pinctrl1, "spi_cs_low");
+        if (IS_ERR(pdata->spi_cs_low)) {
+            cts_err("Cannot find pinctrl spi cs high!\n");
+            return -1;
+        }
+        pdata->spi_cs_high = pinctrl_lookup_state(pdata->pinctrl1, "spi_cs_high");
+        if (IS_ERR(pdata->spi_cs_high)) {
+            return -1;
+        }
+        return 0;
+    }  
+    return -1;
+}          
+#endif
+
+#ifdef CONFIG_CTS_I2C_HOST
 int cts_init_platform_data(struct cts_platform_data *pdata,
         struct i2c_client *i2c_client)
 #else
@@ -431,6 +455,7 @@ int cts_init_platform_data(struct cts_platform_data *pdata,
 {
     struct device_node *node = NULL;
 	u32 ints[2] = { 0, 0 };
+    int ret = 0;
 
     cts_info("Init");
 
@@ -462,7 +487,15 @@ int cts_init_platform_data(struct cts_platform_data *pdata,
         cts_err("Parse irq in dts failed");
         return -ENODEV;
     }
+
+#ifdef CONFIG_CTS_I2C_HOST
+    pdata->i2c_client = i2c_client;
     pdata->i2c_client->irq = pdata->irq;
+#else
+	pdata->spi_client = spi;
+	pdata->spi_client->irq = pdata->irq;
+#endif /* CONFIG_CTS_I2C_HOST */
+
     spin_lock_init(&pdata->irq_lock);
 
 #ifdef CONFIG_CTS_VIRTUALKEY
@@ -494,7 +527,12 @@ int cts_init_platform_data(struct cts_platform_data *pdata,
         cts_plat_touch_event_timeout, (unsigned long)pdata);
 #endif
 
-    return 0;
+#ifndef CONFIG_CTS_I2C_HOST
+    ret = cts_plat_init_dts(pdata, spi);
+    pdata->spi_speed = 8000;
+    cts_plat_spi_set_mode(pdata);
+#endif
+    return ret;
 }
 
 int cts_plat_request_resource(struct cts_platform_data *pdata)
@@ -519,11 +557,11 @@ int cts_plat_request_irq(struct cts_platform_data *pdata)
      */
     ret = request_threaded_irq(pdata->irq,
             NULL, cts_plat_irq_handler, IRQF_TRIGGER_RISING | IRQF_ONESHOT,
-            pdata->i2c_client->dev.driver->name, pdata);
+            CFG_CTS_DRIVER_NAME, pdata);
 #else /* CONFIG_GENERIC_HARDIRQS */
     ret = request_irq(pdata->irq,
             cts_plat_irq_handler, IRQF_TRIGGER_RISING | IRQF_ONESHOT,
-            pdata->i2c_client->dev.driver->name, pdata);
+            CFG_CTS_DRIVER_NAME, pdata);
 #endif /* CONFIG_GENERIC_HARDIRQS */
     if (ret) {
         cts_err("Request IRQ failed %d", ret);
@@ -672,7 +710,9 @@ int cts_plat_process_touch_msg(struct cts_platform_data *pdata,
     int contact = 0;
 
     cts_dbg("Process touch %d msgs", num);
-
+    if (num ==0 || num > CFG_CTS_MAX_TOUCH_NUM) {
+        return 0;    
+    }    
     for (i = 0; i < num; i++) {
         u16 x, y;
 
@@ -971,4 +1011,101 @@ int cts_plat_process_gesture_info(struct cts_platform_data *pdata,
 }
 
 #endif /* CONFIG_CTS_GESTURE */
+
+struct mt_chip_conf cts_spi_conf_mt65xx = {
+    .setuptime = 15,
+    .holdtime = 15,
+    .high_time = 21, //for mt6582, 104000khz/(4+4) = 130000khz
+    .low_time = 21,
+    .cs_idletime = 20,
+    .ulthgh_thrsh = 0,
+
+    .cpol = 0,
+    .cpha = 0,
+
+    .rx_mlsb = 1,
+    .tx_mlsb = 1,
+
+    .tx_endian = 0,
+    .rx_endian = 0,
+
+    .com_mod = FIFO_TRANSFER,
+    .pause = 1,
+    .finish_intr = 1,
+    .deassert = 0,
+    .ulthigh = 0,
+    .tckdly = 0,
+};
+
+typedef enum {
+    SPEED_500KHZ = 500,
+    SPEED_1MHZ = 1000,
+    SPEED_2MHZ = 2000,
+    SPEED_3MHZ = 3000,
+    SPEED_4MHZ = 4000,
+    SPEED_6MHZ = 6000,
+    SPEED_8MHZ = 8000,
+    SPEED_KEEP,
+    SPEED_UNSUPPORTED
+} SPI_SPEED;
+
+void cts_plat_spi_set_mode(struct spi_device *spi, SPI_SPEED speed, int flag)
+{
+    struct mt_chip_conf *mcc = &cts_spi_conf_mt65xx
+    if (flag == 0) {
+        mcc->com_mod = FIFO_TRANSFER;
+    } else {
+        mcc->com_mod = DMA_TRANSFER;
+    }
+
+    switch (speed) {
+    case SPEED_500KHZ:
+        mcc->high_time = 120;
+        mcc->low_time = 120;
+        break;
+    case SPEED_1MHZ:
+        mcc->high_time = 60;
+        mcc->low_time = 60;
+        break;
+    case SPEED_2MHZ:
+        mcc->high_time = 30;
+        mcc->low_time = 30;
+        break;
+    case SPEED_3MHZ:
+        mcc->high_time = 20;
+        mcc->low_time = 20;
+        break;
+    case SPEED_4MHZ:
+        mcc->high_time = 15;
+        mcc->low_time = 15;
+        break;
+    case SPEED_6MHZ:
+        mcc->high_time = 10;
+        mcc->low_time = 10;
+        break;
+    case SPEED_8MHZ:
+        mcc->high_time = 8;
+        mcc->low_time = 8;
+        break;
+    case SPEED_KEEP:
+    case SPEED_UNSUPPORTED:
+        break;
+    }
+    if (spi_setup(spi) < 0) {
+        cts_err("Failed to set spi");
+    }
+}
+
+int cts_plat_spi_set_mode(struct cts_platform_data *pdata)
+{
+    cts_device *cts_dev = pdata->cts_dev;
+    
+    pdata->spi_client->mode = SPI_MODE_0;
+    pdata->spi_client->bits_per_word = 8;
+//  fpsensor->spi_client->chip_select = 0;
+    pdata->spi_client->controller_data = (void *)&fpsensor_spi_conf_mt65xx;
+    spi_setup(pdata->spi_client);
+    cts_plat_spi_set_mode(pdata->spi_client, fpsensor->spi_speed, 0);
+    return 0;
+}
 

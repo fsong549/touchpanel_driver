@@ -141,7 +141,11 @@ static int cts_driver_probe(struct spi_device *client)
 	cts_data->spi_client = client;
 #endif
 
-    cts_init_platform_data(cts_data->pdata, client);
+    ret = cts_init_platform_data(cts_data->pdata, client);
+    if (ret) {
+        cts_err("cts_init_platform_data err");
+        goto err_free_cts_data;
+    }    
 
     cts_data->cts_dev.pdata = cts_data->pdata;
     cts_data->pdata->cts_dev = &cts_data->cts_dev;
@@ -256,8 +260,8 @@ err_free_resource:
 err_destroy_esd_workqueue:
 #ifdef CONFIG_CTS_ESD_PROTECTION
     destroy_workqueue(cts_data->esd_workqueue);
-#endif
 err_destroy_workqueue:
+#endif
     destroy_workqueue(cts_data->workqueue);
 
 err_free_pdata:

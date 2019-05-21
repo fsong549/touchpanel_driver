@@ -198,6 +198,7 @@ struct cts_device_rtdata {
     u8   i2c_addr;
     int  addr_width;
     bool program_mode;
+    bool has_flash;
 
     bool suspended;
     bool updating;
@@ -217,7 +218,6 @@ struct cts_device {
     struct cts_device_rtdata          rtdata;
     const struct cts_flash           *flash;
     bool enabled;
-    bool has_flash;
 
 };
 

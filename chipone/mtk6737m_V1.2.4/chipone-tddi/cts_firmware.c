@@ -264,14 +264,14 @@ const struct cts_firmware *cts_request_driver_builtin_firmware_by_name(const cha
         if (strcmp(firmware->name, name) == 0) {
             if (is_firmware_valid(firmware)) {
                 cts_info("Found driver builtin '%s' "
-                        "hwid: %04x fwid: %04x size: %zu ver: %04x",
+                        "hwid: %06x fwid: %04x size: %zu ver: %04x",
                     firmware->name, firmware->hwid, firmware->fwid,
                     firmware->size, FIRMWARE_VERSION(firmware));
                 return firmware;
             }
 
             cts_warn("Found driver builtin '%s' "
-                    "hwid: %04x fwid: %04x size: %zu invalid",
+                    "hwid: %06x fwid: %04x size: %zu invalid",
                 firmware->name, firmware->hwid, firmware->hwid, firmware->size);
         }
     }
@@ -289,13 +289,13 @@ const struct cts_firmware *cts_request_driver_builtin_firmware_by_index(u32 inde
         firmware = cts_driver_builtin_firmwares + index;
         if (is_firmware_valid(firmware)) {
             cts_info("Found driver builtin '%s' "
-                    "hwid: %04x fwid: %04x size: %zu ver: %04x",
+                    "hwid: %06x fwid: %04x size: %zu ver: %04x",
                 firmware->name, firmware->hwid, firmware->fwid,
                 firmware->size, FIRMWARE_VERSION(firmware));
             return firmware;
         }
         cts_warn("Found driver builtin '%s' "
-                 "hwid: %04x fwid: %04x size: %zu INVALID",
+                 "hwid: %06x fwid: %04x size: %zu INVALID",
             firmware->name, firmware->hwid, firmware->hwid, firmware->size);
     } else {
         cts_warn("Request driver builtin by index %u too large >= %zu",
@@ -317,7 +317,7 @@ static const struct cts_firmware * cts_request_newer_driver_builtin_firmware(
     const struct cts_firmware *firmware = NULL;
     int    i;
 
-    cts_info("Request driver builtin if match hwid: %04x fwid: %04x && ver > %04x",
+    cts_info("Request driver builtin if match hwid: %06x fwid: %04x && ver > %04x",
         hwid, fwid, device_fw_ver);
 
     firmware = cts_driver_builtin_firmwares;
@@ -325,19 +325,19 @@ static const struct cts_firmware * cts_request_newer_driver_builtin_firmware(
         if (MATCH_HWID(firmware, hwid) && MATCH_FWID(firmware, fwid)) {
             if (!is_firmware_valid(firmware)) {
                 cts_err("Found driver builtin '%s' "
-                        "hwid: %04x fwid: %04x INVALID",
+                        "hwid: %06x fwid: %04x INVALID",
                     firmware->name, firmware->hwid, firmware->fwid);
                 continue;
             }
 
             cts_info("Found matched driver builtin '%s' "
-                     "hwid: %04x fwid: %04x size: %zu ver: %04x",
+                     "hwid: %06x fwid: %04x size: %zu ver: %04x",
                 firmware->name, firmware->hwid, firmware->fwid,
                 firmware->size, FIRMWARE_VERSION(firmware));
 
             if(FIRMWARE_VERSION(firmware) > device_fw_ver) {
                 cts_info("Found newer driver builtin '%s' "
-                         "hwid: %04x fwid: %04x size: %zu ver: %04x > %04x",
+                         "hwid: %06x fwid: %04x size: %zu ver: %04x > %04x",
                     firmware->name, firmware->hwid, firmware->fwid,
                     firmware->size, FIRMWARE_VERSION(firmware), device_fw_ver);
                 return firmware;
@@ -511,7 +511,7 @@ const struct cts_firmware *cts_request_firmware(
         fwid =  CTS_DEV_FWID_ANY;
     }
 
-    cts_info("Request newer if match hwid: %04x fwid: %04x && ver > %04x",
+    cts_info("Request newer if match hwid: %06x fwid: %04x && ver > %04x",
         hwid, fwid, curr_firmware_ver);
 
 #ifdef CFG_CTS_DRIVER_BUILTIN_FIRMWARE
@@ -753,7 +753,7 @@ int cts_update_firmware(struct cts_device *cts_dev,
         // Go through and try
     }
 
-    if (!to_flash || !cts_dev->has_flash) {
+    if (!to_flash || !cts_dev->rtdata.has_flash) {
         cts_info("Write firmware section to sram size %zu",
             firmware_info.firmware_sect_size);
         ret = cts_sram_writesb_check_crc_retry(cts_dev,

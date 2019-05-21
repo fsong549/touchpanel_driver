@@ -220,13 +220,13 @@ init_flash:
     if (cts_dev->flash == NULL) {
         cts_info("Flash is not initialized, try to probe...");
         if ((ret = probe_flash(cts_dev)) != 0) {
-			cts_dev->has_flash = false;
+			cts_dev->rtdata.has_flash = false;
             cts_warn("Probe flash failed %d", ret);
             //dzy goto err_enter_normal_mode;
             return 0;
         }
     }
-	cts_dev->has_flash = true;
+	cts_dev->rtdata.has_flash = true;
     return 0;
 
 err_enter_normal_mode:

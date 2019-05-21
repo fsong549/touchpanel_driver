@@ -643,7 +643,7 @@ int cts_short_test(struct cts_device *cts_dev, u16 threshold)
     int  ret;
     u16 *test_result = NULL;
     bool recovery_display_state = false;
-    u8   short_to_gnd_test_method, need_display_on;
+    u8   need_display_on;
     u8   feature_ver;
 
     cts_info("Start short test, threshold = %u", threshold);

@@ -47,7 +47,7 @@
 #endif /* TPD_SUPPORT_I2C_DMA */
 
 #ifdef CONFIG_MTK_BOOT
-#include "mtk_boot_common.h"
+#include "mt_boot_common.h"
 #endif /* CONFIG_MTK_BOOT */
 
 #include "tpd.h"
@@ -124,6 +124,11 @@ struct cts_platform_data {
 	u8 spi_cache_buf[CFG_CTS_MAX_SPI_XFER_SIZE+5];
 	u8 spi_rx_buf[CFG_CTS_MAX_SPI_XFER_SIZE+5];
 	u8 spi_tx_buf[CFG_CTS_MAX_SPI_XFER_SIZE+5];
+	u16 spi_speed;
+#ifdef CFG_CTS_MANUAL_CS
+    struct pinctrl *pinctrl1;
+    struct pinctrl_state *spi_cs_low, *spi_cs_high;
+#endif
 #endif /* CONFIG_CTS_I2C_HOST */
 
     bool dma_available;
@@ -158,6 +163,7 @@ extern int cts_init_platform_data(struct cts_platform_data *pdata,
 extern int cts_plat_is_normal_mode(struct cts_platform_data *pdata);
 extern int cts_init_platform_data(struct cts_platform_data *pdata,
         struct spi_device *spi);
+extern int cts_plat_spi_set_mode(struct cts_platform_data *pdata);
 #endif
 
 extern int cts_plat_request_resource(struct cts_platform_data *pdata);

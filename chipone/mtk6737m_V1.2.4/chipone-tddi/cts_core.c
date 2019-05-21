@@ -950,11 +950,11 @@ const static struct cts_device_hwdata cts_device_hwdatas[] = {
 };
 
 static int cts_init_device_hwdata(struct cts_device *cts_dev,
-        u16 hwid, u16 fwid)
+        u32 hwid, u16 fwid)
 {
     int i;
 
-    cts_dbg("Init hardware data hwid: %04x fwid: %04x", hwid, fwid);
+    cts_info("Init hardware data hwid: %06x fwid: %04x", hwid, fwid);
 
     for (i = 0; i < ARRAY_SIZE(cts_device_hwdatas); i++) {
         if (hwid == cts_device_hwdatas[i].hwid ||
@@ -1215,30 +1215,6 @@ static int cts_set_dev_boot_mode(const struct cts_device *cts_dev,
     }
 
     return 0;
-#if 0
-    do {
-        mdelay(10);
-
-        ret = cts_hw_reg_readb(cts_dev, CTS_DEV_HW_REG_BOOT_MODE, &curr_boot_mode);
-        if (ret) {
-            cts_err("Read hw register BOOT_MODE failed %d retries %d",
-                ret, retries);
-            continue
-        }
-
-        if (curr_boot_mode == boot_mode) {
-            cts_info("Set boot mode to %s success",
-                cts_dev_boot_mode2str(boot_mode));
-            return 0;
-        }
-
-        cts_info("Curr boot mode: %u(%s) != %u(%s) retries %d",
-                curr_boot_mode, cts_dev_boot_mode2str(curr_boot_mode),
-                boot_mode, cts_dev_boot_mode2str(boot_mode), retries);
-    } while (retries < 100);
-
-    return -EFAULT;
-#endif
 }
 
 static int cts_init_fwdata(struct cts_device *cts_dev)
@@ -1297,6 +1273,7 @@ static int cts_init_fwdata(struct cts_device *cts_dev)
     return 0;
 }
 
+#if 0
 static int cts_post_reset_device(struct cts_device *cts_dev)
 {
     int ret;
@@ -1307,6 +1284,7 @@ static int cts_post_reset_device(struct cts_device *cts_dev)
     cts_dev->rtdata.updating     = false;
     cts_dev->rtdata.testing      = false;
 
+#if 0
 #ifdef CONFIG_CTS_I2C_HOST
     /* Check whether device is in normal mode */
     if (!cts_plat_is_i2c_online(cts_dev->pdata,
@@ -1357,6 +1335,7 @@ static int cts_post_reset_device(struct cts_device *cts_dev)
         cts_err("Init fwdata failed %d", ret);
         return ret;
     }
+#endif
 
 #ifdef CONFIG_CTS_CHARGER_DETECT
     if (cts_is_charger_exist(cts_dev)) {
@@ -1422,6 +1401,7 @@ int cts_reset_device(struct cts_device *cts_dev)
 
     return cts_post_reset_device(cts_dev);
 }
+#endif
 
 #ifdef CFG_CTS_FW_LOG_REDIRECT
 void cts_show_fw_log(struct cts_device *cts_dev)
@@ -1575,30 +1555,35 @@ int cts_suspend_device(struct cts_device *cts_dev)
 int cts_resume_device(struct cts_device *cts_dev)
 {
     int ret;
-	int retries = 6;
+	int retries = 3;
+	u8 boot_mode;
 	
     cts_info("Resume device");
-
-	cts_dev->rtdata.program_mode = false;
-	cts_dev->rtdata.i2c_addr     = CTS_DEV_NORMAL_MODE_I2CADDR;
-	cts_dev->rtdata.addr_width   = 2;    
-
-	while (--retries >= 0){
+	while (--retries >= 0) {
+    	cts_dev->rtdata.program_mode = false;
+    	cts_dev->rtdata.i2c_addr     = CTS_DEV_NORMAL_MODE_I2CADDR;
+    	cts_dev->rtdata.addr_width   = CTS_DEV_NORMAL_MODE_ADDR_WIDTH;    
 #ifdef CONFIG_CTS_I2C_HOST
-		if (cts_plat_is_i2c_online(cts_dev->pdata, CTS_DEV_NORMAL_MODE_I2CADDR)) {
+		if (cts_plat_is_i2c_online(cts_dev->pdata, CTS_DEV_NORMAL_MODE_I2CADDR))
 #else
-	    if (!cts_plat_is_normal_mode(cts_dev->pdata)) {
+	    if (cts_plat_is_normal_mode(cts_dev->pdata))
 #endif
+        {
 			break;
 		}
-		cts_warn("Resume device, but i2c is offline");
-		msleep(50);
+		cts_warn("Resume device, but dev is offline");
+		if (!cts_dev->rtdata.has_flash) { 
+            cts_dev->rtdata.program_mode = true;
+            cts_dev->rtdata.i2c_addr     = CTS_DEV_PROGRAM_MODE_I2CADDR;
+            cts_dev->rtdata.addr_width   = CTS_DEV_NORMAL_MODE_ADDR_WIDTH;    
+            cts_enter_normal_mode(cts_dev);
+        }
+        else {
 #ifdef CFG_CTS_HAS_RESET_PIN
-		cts_plat_reset_device(cts_dev->pdata);
+		    cts_plat_reset_device(cts_dev->pdata);
 #endif				
+        }    
 	}	
-	
-	/* DDI has just do chip reset, do nothing here */
 
     /* Check whether device is in normal mode */
 	if (retries < 0) {
@@ -1706,19 +1691,22 @@ int cts_enter_program_mode(struct cts_device *cts_dev)
 	}
 #endif /* CONFIG_CTS_I2C_HOST */
 
-    cts_dev->rtdata.i2c_addr     = CTS_DEV_PROGRAM_MODE_I2CADDR;
+    //cts_dev->rtdata.i2c_addr     = CTS_DEV_PROGRAM_MODE_I2CADDR;
+    cts_dev->rtdata.program_mode = true;
     cts_dev->rtdata.addr_width   = CTS_DEV_PROGRAM_MODE_ADDR_WIDTH;
 
+#ifdef CONFIG_CTS_I2C_HOST
     /* Write i2c deglitch register */
     ret = cts_hw_reg_writeb_retry(cts_dev, 0x37001, 0x0F, 5, 1);
     if (ret) {
         cts_err("Write i2c deglitch register failed\n");
         // FALL through
     }
+#endif
 
-    ret = cts_hw_reg_readb_retry(cts_dev, 0x30010, &boot_mode, 5, 10);
+    ret = cts_get_dev_boot_mode(cts_dev, &boot_mode);
     if (ret) {
-        cts_err("Read rBOOT_MODE failed %d", ret);
+        cts_err("Read BOOT_MODE failed %d", ret);
         return ret;
     }
 
@@ -1765,71 +1753,57 @@ int cts_enter_normal_mode(struct cts_device *cts_dev)
         cts_warn("Enter normal mode while already in");
         return 0;
     }
-
-    ret = cts_set_dev_boot_mode(cts_dev, CTS_DEV_BOOT_MODE_SRAM);
-    if (ret) {
-        cts_err("Set BOOT_MODE to SRAM failed %d, try to reset device", ret);
-
-        ret = cts_plat_reset_device(cts_dev->pdata);
+	for(retries = 1; retries >= 0; retries--) {
+#ifdef CONFIG_CTS_I2C_HOST
+        ret = cts_set_dev_boot_mode(cts_dev, CTS_DEV_BOOT_MODE_SRAM);
         if (ret) {
-            cts_err("Platform reset device failed %d", ret);
+            cts_err("Set BOOT_MODE to SRAM failed %d, try to reset device", ret);
+        }
+        mdelay(30);
+        if (cts_plat_is_i2c_online(cts_dev->pdata, CTS_DEV_NORMAL_MODE_I2CADDR)) {
+            cts_dev->rtdata.program_mode = false;
+            cts_dev->rtdata.i2c_addr     = CTS_DEV_NORMAL_MODE_I2CADDR;
+            cts_dev->rtdata.addr_width   = CTS_DEV_NORMAL_MODE_ADDR_WIDTH;
+        }
+#else
+	    cts_dev->rtdata.program_mode = true;
+	    cts_dev->rtdata.addr_width = CTS_DEV_PROGRAM_MODE_ADDR_WIDTH;
+        ret = cts_set_dev_boot_mode(cts_dev, CTS_DEV_BOOT_MODE_SRAM);
+        if (ret) {
+            cts_err("Set BOOT_MODE to SRAM failed %d, try to reset device", ret);
+    
+        }	
+        mdelay(30);
+	    cts_dev->rtdata.program_mode = false;
+	    cts_dev->rtdata.addr_width = CTS_DEV_NORMAL_MODE_ADDR_WIDTH;
+#endif	    
+        ret = cts_get_dev_boot_mode(cts_dev, &boot_mode);
+        if (ret) {
+            cts_err("Get BOOT_MODE failed %d", ret);
+        }
+        if (boot_mode != CTS_DEV_BOOT_MODE_SRAM) {
+            cts_err("Curr boot mode %u(%s) != SRAM_BOOT",
+                boot_mode, cts_dev_boot_mode2str(boot_mode));
+        }
+        else {
+            break;
+        }    
+        cts_plat_reset_device(cts_dev->pdata);
+	}
+	if (retries >= 0) {
+        ret = cts_init_fwdata(cts_dev);
+        if (ret) {
+            cts_err("Device init firmware data failed %d", ret);
             return ret;
         }
+        return 0;
     }
+err_init_i2c_program_mode:
+    cts_dev->rtdata.program_mode = true;
+    cts_dev->rtdata.i2c_addr     = CTS_DEV_PROGRAM_MODE_I2CADDR;
+    cts_dev->rtdata.addr_width   = CTS_DEV_PROGRAM_MODE_ADDR_WIDTH;
 
-    mdelay(30);
-
-#ifdef CONFIG_CTS_I2C_HOST
-    if (cts_plat_is_i2c_online(cts_dev->pdata, CTS_DEV_NORMAL_MODE_I2CADDR)) {
-        cts_dev->rtdata.program_mode = false;
-        cts_dev->rtdata.i2c_addr     = CTS_DEV_NORMAL_MODE_I2CADDR;
-        cts_dev->rtdata.addr_width   = CTS_DEV_NORMAL_MODE_ADDR_WIDTH;
-    } else if (cts_plat_is_i2c_online(cts_dev->pdata, CTS_DEV_PROGRAM_MODE_I2CADDR)) {
-        cts_dev->rtdata.program_mode = true;
-        cts_dev->rtdata.i2c_addr     = CTS_DEV_PROGRAM_MODE_I2CADDR;
-        cts_dev->rtdata.addr_width   = CTS_DEV_PROGRAM_MODE_ADDR_WIDTH;
-
-        return -ENODEV;
-    } else {
-        return -EFAULT;
-    }
-#else
-	cts_dev->rtdata.program_mode = false;
-	//cts_dev->rtdata.i2c_addr	 = CTS_DEV_NORMAL_MODE_I2CADDR;
-	cts_dev->rtdata.addr_width	 = CTS_DEV_NORMAL_MODE_ADDR_WIDTH;
-#endif /* CONFIG_CTS_I2C_HOST */
-	for(retries = 0; retries < 100; retries++) {
-	    ret = cts_set_dev_boot_mode(cts_dev, CTS_DEV_BOOT_MODE_SRAM);
-	    if (ret) {
-	        cts_err("Set BOOT_MODE to SRAM failed %d, try to reset device", ret);
-
-	        ret = cts_plat_reset_device(cts_dev->pdata);
-	        if (ret) {
-	            cts_err("Platform reset device failed %d", ret);
-	            //return ret;
-	        }
-	    }	
-	    ret = cts_get_dev_boot_mode(cts_dev, &boot_mode);
-	    if (ret) {
-	        cts_err("Get BOOT_MODE failed %d", ret);
-
-	        /* Try to do hard reset if switch boot mode failed */
-	        //return cts_reset_device(cts_dev);
-	    }
-
-	    if (boot_mode != CTS_DEV_BOOT_MODE_SRAM) {
-	        cts_err("Curr boot mode %u(%s) != SRAM_BOOT,try=%d",
-	            boot_mode, cts_dev_boot_mode2str(boot_mode),retries);
-
-	        /* Try to do hard reset if switch boot mode failed */
-	        //return cts_reset_device(cts_dev);
-	    }
-		else {
-			break;
-		}	
-		mdelay(500);
-	}
-    return cts_post_reset_device(cts_dev);
+    return ret;
 }
 
 bool cts_is_device_enabled(const struct cts_device *cts_dev)
@@ -2119,6 +2093,10 @@ read_fwid:
     } else
 #endif
     {
+        ret = cts_get_fwid(cts_dev, &fwid);
+        if (ret) {
+            cts_err("Get firmware id failed %d, retries %d", ret, retries);
+        } else {
             ret = cts_fw_reg_readw_retry(cts_dev,
                     CTS_DEVICE_FW_REG_VERSION, &device_fw_ver, 5, 0);
             if (ret) {
@@ -2130,6 +2108,7 @@ read_fwid:
                 cts_info("Device firmware version: %04x", device_fw_ver);
             }
             goto init_hwdata;
+        }     
     }
     
     /** - Try to read hardware id,
@@ -2151,7 +2130,7 @@ read_fwid:
 init_hwdata:
     ret = cts_init_device_hwdata(cts_dev, hwid, fwid);
     if (ret) {
-        cts_err("Device hwid: %04x fwid: %04x not found", hwid, fwid);
+        cts_err("Device hwid: %06x fwid: %04x not found", hwid, fwid);
         return -ENODEV;
     }
 
