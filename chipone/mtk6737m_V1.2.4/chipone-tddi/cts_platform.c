@@ -3,10 +3,112 @@
 #include "cts_config.h"
 #include "cts_platform.h"
 #include "cts_core.h"
-#include "../../../../spi/mediatek/mt6757/mtk_spi.h"
+//#include "../../../../spi/mediatek/mt6757/mtk_spi.h"
+#include "linux/spi/spi.h"
+#include "mt_spi.h"
 
 int tpd_rst_gpio_index = 0;
 int tpd_int_gpio_index = 1;
+
+
+#ifndef CONFIG_CTS_I2C_HOST
+struct mt_chip_conf cts_spi_conf_mt65xx = {
+    .setuptime = 15,
+    .holdtime = 15,
+    .high_time = 21, //for mt6582, 104000khz/(4+4) = 130000khz
+    .low_time = 21,
+    .cs_idletime = 20,
+    .ulthgh_thrsh = 0,
+
+    .cpol = 0,
+    .cpha = 0,
+
+    .rx_mlsb = 1,
+    .tx_mlsb = 1,
+
+    .tx_endian = 0,
+    .rx_endian = 0,
+
+    .com_mod = FIFO_TRANSFER,
+    .pause = 1,
+    .finish_intr = 1,
+    .deassert = 0,
+    .ulthigh = 0,
+    .tckdly = 0,
+};
+
+typedef enum {
+    SPEED_500KHZ = 500,
+    SPEED_1MHZ = 1000,
+    SPEED_2MHZ = 2000,
+    SPEED_3MHZ = 3000,
+    SPEED_4MHZ = 4000,
+    SPEED_6MHZ = 6000,
+    SPEED_8MHZ = 8000,
+    SPEED_KEEP,
+    SPEED_UNSUPPORTED
+} SPI_SPEED;
+
+void cts_plat_spi_set_mode(struct spi_device *spi, SPI_SPEED speed, int flag)
+{
+    struct mt_chip_conf *mcc = &cts_spi_conf_mt65xx;
+    if (flag == 0) {
+        mcc->com_mod = FIFO_TRANSFER;
+    } else {
+        mcc->com_mod = DMA_TRANSFER;
+    }
+
+    switch (speed) {
+    case SPEED_500KHZ:
+        mcc->high_time = 120;
+        mcc->low_time = 120;
+        break;
+    case SPEED_1MHZ:
+        mcc->high_time = 60;
+        mcc->low_time = 60;
+        break;
+    case SPEED_2MHZ:
+        mcc->high_time = 30;
+        mcc->low_time = 30;
+        break;
+    case SPEED_3MHZ:
+        mcc->high_time = 20;
+        mcc->low_time = 20;
+        break;
+    case SPEED_4MHZ:
+        mcc->high_time = 15;
+        mcc->low_time = 15;
+        break;
+    case SPEED_6MHZ:
+        mcc->high_time = 10;
+        mcc->low_time = 10;
+        break;
+    case SPEED_8MHZ:
+        mcc->high_time = 8;
+        mcc->low_time = 8;
+        break;
+    case SPEED_KEEP:
+    case SPEED_UNSUPPORTED:
+        break;
+    }
+    if (spi_setup(spi) < 0) {
+        cts_err("Failed to set spi");
+    }
+}
+
+int cts_plat_spi_setup(struct cts_platform_data *pdata)
+{
+    //cts_device *cts_dev = pdata->cts_dev;
+    
+    pdata->spi_client->mode = SPI_MODE_0;
+    pdata->spi_client->bits_per_word = 8;
+//  fpsensor->spi_client->chip_select = 0;
+    pdata->spi_client->controller_data = (void *)&cts_spi_conf_mt65xx;
+    spi_setup(pdata->spi_client);
+    cts_plat_spi_set_mode(pdata->spi_client, pdata->spi_speed, 0);
+    return 0;
+}
+#endif
 
 #ifdef CFG_CTS_FW_LOG_REDIRECT
 size_t cts_plat_get_max_fw_log_size(struct cts_platform_data *pdata)
@@ -53,7 +155,7 @@ int cts_plat_i2c_write(struct cts_platform_data *pdata, u8 i2c_addr,
 
 #ifdef TPD_SUPPORT_I2C_DMA
     struct i2c_msg msg = {
-        .addr   = i2c_addr;
+        .addr   = i2c_addr,
         .flags  = !I2C_M_RD,
         .len    = len,
         .timing = 300,
@@ -66,7 +168,7 @@ int cts_plat_i2c_write(struct cts_platform_data *pdata, u8 i2c_addr,
     } else {
         msg.buf = (u8 *)src;
     }
-    msg->len  = len;
+    msg.len  = len;
 #else
     struct i2c_msg msg = {
         .addr  = i2c_addr,
@@ -223,7 +325,7 @@ int cts_spi_send_recv(struct cts_platform_data *pdata, size_t len , u8 *tx_buffe
     spi_message_init(&msg);
     spi_message_add_tail(&cmd,  &msg);
     ret = spi_sync(cts_data->spi_client, &msg);
-    if (error) {
+    if (ret) {
         cts_err("spi_sync failed.\n");
     }
 #ifdef CFG_CTS_MANUAL_CS
@@ -419,7 +521,7 @@ static void cts_plat_touch_event_timeout(unsigned long arg)
 }
 #endif
 
-#ifdef CONFIG_CTS_I2C_HOST
+#ifndef CONFIG_CTS_I2C_HOST
 static int cts_plat_init_dts(struct cts_platform_data *pdata,
                                     struct spi_device *spi)
 {
@@ -530,7 +632,7 @@ int cts_init_platform_data(struct cts_platform_data *pdata,
 #ifndef CONFIG_CTS_I2C_HOST
     ret = cts_plat_init_dts(pdata, spi);
     pdata->spi_speed = 8000;
-    cts_plat_spi_set_mode(pdata);
+    cts_plat_spi_setup(pdata);
 #endif
     return ret;
 }
@@ -1011,101 +1113,3 @@ int cts_plat_process_gesture_info(struct cts_platform_data *pdata,
 }
 
 #endif /* CONFIG_CTS_GESTURE */
-
-struct mt_chip_conf cts_spi_conf_mt65xx = {
-    .setuptime = 15,
-    .holdtime = 15,
-    .high_time = 21, //for mt6582, 104000khz/(4+4) = 130000khz
-    .low_time = 21,
-    .cs_idletime = 20,
-    .ulthgh_thrsh = 0,
-
-    .cpol = 0,
-    .cpha = 0,
-
-    .rx_mlsb = 1,
-    .tx_mlsb = 1,
-
-    .tx_endian = 0,
-    .rx_endian = 0,
-
-    .com_mod = FIFO_TRANSFER,
-    .pause = 1,
-    .finish_intr = 1,
-    .deassert = 0,
-    .ulthigh = 0,
-    .tckdly = 0,
-};
-
-typedef enum {
-    SPEED_500KHZ = 500,
-    SPEED_1MHZ = 1000,
-    SPEED_2MHZ = 2000,
-    SPEED_3MHZ = 3000,
-    SPEED_4MHZ = 4000,
-    SPEED_6MHZ = 6000,
-    SPEED_8MHZ = 8000,
-    SPEED_KEEP,
-    SPEED_UNSUPPORTED
-} SPI_SPEED;
-
-void cts_plat_spi_set_mode(struct spi_device *spi, SPI_SPEED speed, int flag)
-{
-    struct mt_chip_conf *mcc = &cts_spi_conf_mt65xx
-    if (flag == 0) {
-        mcc->com_mod = FIFO_TRANSFER;
-    } else {
-        mcc->com_mod = DMA_TRANSFER;
-    }
-
-    switch (speed) {
-    case SPEED_500KHZ:
-        mcc->high_time = 120;
-        mcc->low_time = 120;
-        break;
-    case SPEED_1MHZ:
-        mcc->high_time = 60;
-        mcc->low_time = 60;
-        break;
-    case SPEED_2MHZ:
-        mcc->high_time = 30;
-        mcc->low_time = 30;
-        break;
-    case SPEED_3MHZ:
-        mcc->high_time = 20;
-        mcc->low_time = 20;
-        break;
-    case SPEED_4MHZ:
-        mcc->high_time = 15;
-        mcc->low_time = 15;
-        break;
-    case SPEED_6MHZ:
-        mcc->high_time = 10;
-        mcc->low_time = 10;
-        break;
-    case SPEED_8MHZ:
-        mcc->high_time = 8;
-        mcc->low_time = 8;
-        break;
-    case SPEED_KEEP:
-    case SPEED_UNSUPPORTED:
-        break;
-    }
-    if (spi_setup(spi) < 0) {
-        cts_err("Failed to set spi");
-    }
-}
-
-int cts_plat_spi_set_mode(struct cts_platform_data *pdata)
-{
-    cts_device *cts_dev = pdata->cts_dev;
-    
-    pdata->spi_client->mode = SPI_MODE_0;
-    pdata->spi_client->bits_per_word = 8;
-//  fpsensor->spi_client->chip_select = 0;
-    pdata->spi_client->controller_data = (void *)&fpsensor_spi_conf_mt65xx;
-    spi_setup(pdata->spi_client);
-    cts_plat_spi_set_mode(pdata->spi_client, fpsensor->spi_speed, 0);
-    return 0;
-}
-

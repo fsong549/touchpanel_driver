@@ -1554,9 +1554,9 @@ int cts_suspend_device(struct cts_device *cts_dev)
 
 int cts_resume_device(struct cts_device *cts_dev)
 {
-    int ret;
-	int retries = 3;
-	u8 boot_mode;
+    int ret = 0;
+    int retries = 3;
+	//u8 boot_mode;
 	
     cts_info("Resume device");
 	while (--retries >= 0) {
@@ -1798,7 +1798,7 @@ int cts_enter_normal_mode(struct cts_device *cts_dev)
         }
         return 0;
     }
-err_init_i2c_program_mode:
+//err_init_i2c_program_mode:
     cts_dev->rtdata.program_mode = true;
     cts_dev->rtdata.i2c_addr     = CTS_DEV_PROGRAM_MODE_I2CADDR;
     cts_dev->rtdata.addr_width   = CTS_DEV_PROGRAM_MODE_ADDR_WIDTH;

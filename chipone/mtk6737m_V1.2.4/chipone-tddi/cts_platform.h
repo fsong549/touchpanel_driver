@@ -163,7 +163,7 @@ extern int cts_init_platform_data(struct cts_platform_data *pdata,
 extern int cts_plat_is_normal_mode(struct cts_platform_data *pdata);
 extern int cts_init_platform_data(struct cts_platform_data *pdata,
         struct spi_device *spi);
-extern int cts_plat_spi_set_mode(struct cts_platform_data *pdata);
+extern int cts_plat_spi_setup(struct cts_platform_data *pdata);
 #endif
 
 extern int cts_plat_request_resource(struct cts_platform_data *pdata);
